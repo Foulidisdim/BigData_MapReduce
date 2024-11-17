@@ -2,8 +2,6 @@ package com.MapReduce.Hadoop_MapReduce;
 
 import java.io.IOException;
 
-import javax.swing.text.html.HTMLDocument.Iterator;
-
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.fs.Path;
@@ -92,7 +90,7 @@ public class App extends Configured implements Tool {
 		public int run(String[] args) throws Exception {
 			Job job1 = Job.getInstance(getConf());
 			job1.setJarByClass(App.class);
-			job1.setNumReduceTasks(2);
+			job1.setNumReduceTasks(1);
 			job1.setMapperClass(TeamSizeMapper.class);
 			job1.setReducerClass(UniqueTeamsReducer.class);
 			job1.setOutputKeyClass(Text.class);
@@ -106,6 +104,11 @@ public class App extends Configured implements Tool {
 			
 			long totalTeams = job1.getCounters().findCounter(UniqueTeamsReducer.MyCounters.TEAM_COUNTER).getValue();
 			long totalSize = job1.getCounters().findCounter(UniqueTeamsReducer.MyCounters.TOTAL_SIZE).getValue();
+			double averageTeamSize = (double) totalTeams/totalSize; //upologismos mesou orou mege8ous omadwn
+			
+			getConf().setDouble("average team size",averageTeamSize);
+			
+			
 			
 			return 0;
 		}
