@@ -20,8 +20,8 @@ import org.apache.hadoop.util.ToolRunner;
 
 public class App extends Configured implements Tool {
 	
-	//prwti fasi map stelnei pair omada kai mege8os
-	public static class TeamsMapper extends Mapper<LongWritable, Text, Text, IntWritable> {
+	//prwti fasi map stelnei pairs apo omada kai mege8os
+	public static class TeamSizeMapper extends Mapper<LongWritable, Text, Text, IntWritable> {
 	Text mapKey = new Text();
 	IntWritable mapValue = new IntWritable();
 	
@@ -43,14 +43,15 @@ public class App extends Configured implements Tool {
 		} 
 	}
 	
-	//prwti fasi reduce stelnei pairs omades mia fora me mege8os tous kai pli8os omadwn
-	public static class TeamsReducer extends Reducer<Text,IntWritable,Text,IntWritable> {
-		private IntWritable teams = new IntWritable();
-		private IntWritable teams_size = new IntWritable();
-		private int teams_counter = 0;
-		private int size = 0;
-		private Text totalTeamsKey = new Text("Total teams");
-		private Text totalSizeKey = new Text("Total size");
+	//prwti fasi reduce stelnei MONADIKA (oxi diplotipa) pairs omadas-megethous kai sunoliko plithos kai megethos olon ton omadon
+	public static class UniqueTeamsReducer extends Reducer<Text,IntWritable,Text,IntWritable> {
+	
+		private long size = 0;
+		
+		public static enum MyCounters{
+			TEAM_COUNTER, //counter gia to plhthos monadikon teams
+			TOTAL_SIZE //counter gia to sunoliko plhthos atomon olon ton monadikon teams
+		}
 		
 		@Override
 		public void reduce(Text key, Iterable<IntWritable> values, Context context)
@@ -69,34 +70,44 @@ public class App extends Configured implements Tool {
 				break;
 			}
 			//int sum = values[0];
-			teams_counter++;
 			//double mo = sum/teams;
 			//result.set(sum); 
-			teams.set(teams_counter);
-			teams_size.set(size);
-			//context.write(key, result);
+			
+			//teams.set(teams_counter);
+			//teams_size.set(size);
+			
+			context.getCounter(MyCounters.TEAM_COUNTER).increment(1);
+			context.getCounter(MyCounters.TOTAL_SIZE).increment(size);
+		
 			context.write(key, firstValue);
-			context.write(totalTeamsKey, teams); //elpizw auto na ftiaxnei mono ena idio pair
-			context.write(totalSizeKey, teams_size);
+			//context.write(totalTeamsKey, teams); //elpizw auto na ftiaxnei mono ena idio pair
+			//context.write(totalSizeKey, teams_size);
 			
 			
 		} 
 		
+		
 	}
 		
 		public int run(String[] args) throws Exception {
-			Job job = Job.getInstance(getConf());
-			job.setJarByClass(App.class);
-			job.setNumReduceTasks(2);
-			job.setMapperClass(TeamsMapper.class);
-			job.setReducerClass(TeamsReducer.class);
-			job.setOutputKeyClass(Text.class);
-			job.setOutputValueClass(IntWritable.class);
-			FileInputFormat.addInputPath(job, new Path(args[0]));
-			FileOutputFormat.setOutputPath(job, new Path(args[1]));
+			Job job1 = Job.getInstance(getConf());
+			job1.setJarByClass(App.class);
+			job1.setNumReduceTasks(2);
+			job1.setMapperClass(TeamSizeMapper.class);
+			job1.setReducerClass(UniqueTeamsReducer.class);
+			job1.setOutputKeyClass(Text.class);
+			job1.setOutputValueClass(IntWritable.class);
+			FileInputFormat.addInputPath(job1, new Path(args[0]));
+			FileOutputFormat.setOutputPath(job1, new Path(args[1]));
 		
-			int completion = job.waitForCompletion(true) ? 0 : 1;
-			return(completion);
+			int completion = job1.waitForCompletion(true) ? 0 : 1;
+			if (!job1.waitForCompletion(true))
+				return 1; //Exit if Job1 fails
+			
+			long totalTeams = job1.getCounters().findCounter(UniqueTeamsReducer.MyCounters.TEAM_COUNTER).getValue();
+			long totalSize = job1.getCounters().findCounter(UniqueTeamsReducer.MyCounters.TOTAL_SIZE).getValue();
+			
+			return 0;
 		}
 
 	 public static void main(String[] args) throws Exception{
