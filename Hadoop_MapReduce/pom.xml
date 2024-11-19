@@ -14,6 +14,15 @@
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
   </properties>
 
+	<!--So maven can download dependencies from the official repository -->
+	<repositories>
+		<repository>
+			<id>central</id>
+			<url>https://repo.maven.apache.org/maven2</url>
+		</repository>
+	</repositories>
+
+
   <dependencies>
     <dependency>
       <groupId>junit</groupId>
@@ -21,7 +30,6 @@
       <version>3.8.1</version>
       <scope>test</scope>
     </dependency>
-    
     <dependency>
 		<groupId>org.apache.hadoop</groupId>
 		<artifactId>hadoop-common</artifactId>
@@ -42,5 +50,11 @@
 		<artifactId>hadoop-mapreduce-client-jobclient</artifactId>
 		<version>3.3.0</version>
 	</dependency>
+	<!--dependency for CSV READER -->
+	<!--<dependency>
+		<groupId>com.opencsv</groupId>
+		<artifactId>opencsv</artifactId>
+		<version>5.6</version>
+	</dependency>-->
   </dependencies>
 </project>

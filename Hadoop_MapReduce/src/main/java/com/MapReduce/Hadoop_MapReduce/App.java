@@ -1,6 +1,7 @@
 package com.MapReduce.Hadoop_MapReduce;
 
 import java.io.IOException;
+import java.io.StringReader;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
@@ -15,6 +16,8 @@ import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
+
+//import com.opencsv.CSVReader;
 
 public class App extends Configured implements Tool {
 	
@@ -32,13 +35,17 @@ public class App extends Configured implements Tool {
 			throws IOException, InterruptedException {
 			String record = value.toString(); //each record
 			try {
+				if(record.startsWith("id")) return; //agnooume tin prwti grammi twn dyo arxeiwn poy apla onomazei ta pedia
+	
 				String record_fields[] = record.split(";");
-				//String authors[] = record_fields[1].split("\\|"); //pipeline escape , yparxei la8os, mallon den metraei swsta tous authors giati aytoi mporei na exoun spaces kai ""
-				String authors[] = record_fields[1].split("\\s*\\|\\s*"); //kanoniki ekfrasi wste oi authors na ginontai split mono me basi to | kai oxi me endexomena spaces i ""
-				
-				mapValue.set(authors.length);
-				mapKey.set(record_fields[1]);
-				context.write(mapKey, mapValue);
+				String authors[] = record_fields[1].split("\\|"); //pipeline escape , yparxei la8os, mallon den metraei swsta tous authors giati aytoi mporei na exoun spaces kai ""
+				//String authors[] = record_fields[1].split("\\s*\\|\\s*"); //kanoniki ekfrasi wste oi authors na ginontai split mono me basi to | kai oxi me endexomena spaces i ""
+				if(authors.length>0) { //wste na agnoisoume eggrafes poy einai kenes sto 2o pedio
+					mapValue.set(authors.length);
+					mapKey.set(record_fields[1]);
+					context.write(mapKey, mapValue);
+				}
+
 			} catch (Exception e) {
 				e.printStackTrace();
 			} 
@@ -48,7 +55,6 @@ public class App extends Configured implements Tool {
 	
 	//prwti fasi reduce stelnei MONADIKA (oxi diplotipa) pairs omadas-megethous kai sunoliko plithos kai megethos olon ton omadon
 	public static class UniqueTeamsReducer extends Reducer<Text,IntWritable,Text,IntWritable> {
-	
 		
 		public static enum MyCounters{
 			TEAM_COUNTER, //counter gia to plhthos monadikon teams
