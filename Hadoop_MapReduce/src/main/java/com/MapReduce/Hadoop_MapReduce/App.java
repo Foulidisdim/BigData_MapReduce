@@ -1,7 +1,6 @@
 package com.MapReduce.Hadoop_MapReduce;
 
 import java.io.IOException;
-import java.io.StringReader;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
@@ -16,8 +15,6 @@ import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
-
-//import com.opencsv.CSVReader;
 
 public class App extends Configured implements Tool {
 	
@@ -34,15 +31,16 @@ public class App extends Configured implements Tool {
 		public void map(LongWritable key, Text value, Context context) 
 			throws IOException, InterruptedException {
 			String record = value.toString(); //each record
+			
 			try {
-				if(record.startsWith("id")) return; //agnooume tin prwti grammi twn dyo arxeiwn poy apla onomazei ta pedia
+				if(record.startsWith("id")) return; //agnooume tin prwti grammi twn dyo arxeiwn poy apla onomazei ta pedia - to dokimasa to kanei ontws avoid
 	
 				String record_fields[] = record.split(";");
 				String authors[] = record_fields[1].split("\\|"); //pipeline escape , yparxei la8os, mallon den metraei swsta tous authors giati aytoi mporei na exoun spaces kai ""
-				//String authors[] = record_fields[1].split("\\s*\\|\\s*"); //kanoniki ekfrasi wste oi authors na ginontai split mono me basi to | kai oxi me endexomena spaces i ""
-				if(authors.length>0) { //wste na agnoisoume eggrafes poy einai kenes sto 2o pedio
+				
+				if(!record_fields[1].isEmpty()) { //wste na agnoisoume eggrafes poy einai kenes sto 2o pedio. Etsi leitoyrgei ontws alla me authors.len > 0 oxi
 					mapValue.set(authors.length);
-					mapKey.set(record_fields[1]);
+					mapKey.set(record_fields[1] + ","); //gia na diaxwristoun me ,
 					context.write(mapKey, mapValue);
 				}
 
@@ -107,15 +105,13 @@ public class App extends Configured implements Tool {
 		@Override
 		public void map(LongWritable key, Text value, Context context) {
 			//take the value from output file from phase 1 MapReduce
-			String teams_and_size[] = value.toString().split("\\s+"); //this will split if we have more than one spaces
+			String line = value.toString();
+			String teams_and_size[] = line.split(",\\s*");//kanoniki ekfrasi wste na kanei split me to , akolou8oumeno me miden i perissotera kena
 			
-			if(teams_and_size.length > 1) { //tin ebala giati sto output tis prwtis fasis yparxei enas assos sthn prwti grammi monos tou
 				try {
-					//String teamName = teams_and_size[0];
 					
 					int teamSize = Integer.parseInt(teams_and_size[1]);
-						
-					//mapKey.set(teamName);
+
 					mapKey.set("BelowAverage"); //den 8eloume tis omades mono poses einai. Ara ayto 8a boi8isei ton reducer apla na kanei sum aytou tou minadikou kleidiou
 					mapValue.set(1);
 							
@@ -129,7 +125,6 @@ public class App extends Configured implements Tool {
 				} catch (InterruptedException e) {
 					e.printStackTrace();
 				}
-			}
 			
 		}
 		
