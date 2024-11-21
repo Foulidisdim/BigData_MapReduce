@@ -1,6 +1,7 @@
 package com.MapReduce.Hadoop_MapReduce;
 
 import java.io.IOException;
+import java.util.Iterator;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
@@ -19,28 +20,28 @@ import org.apache.hadoop.util.ToolRunner;
 public class App extends Configured implements Tool {
 	
 	
-	//First MapReduce phase
+	//!First MapReduce phase!
 	
-	
-	//prwti fasi map stelnei pairs apo omada kai mege8os
+	//The first Mapper outputs ALL pairs of Author teams and their respective size. 
+	//Each team may have publishes multiple papers, so duplicate entries exist!
 	public static class TeamSizeMapper extends Mapper<LongWritable, Text, Text, IntWritable> {
-	Text mapKey = new Text();
-	IntWritable mapValue = new IntWritable();
+		Text mapKey = new Text();
+		IntWritable mapValue = new IntWritable();
 	
 		@Override
-		public void map(LongWritable key, Text value, Context context) 
+		public void map(LongWritable key, Text value, Context context)
 			throws IOException, InterruptedException {
-			String record = value.toString(); //each record
+			String record = value.toString(); //A single record from the CSV input files each time. 
 			
 			try {
-				if(record.startsWith("id")) return; //agnooume tin prwti grammi twn dyo arxeiwn poy apla onomazei ta pedia - to dokimasa to kanei ontws avoid
+				if(record.startsWith("id")) return; //Ignore the first line in the CSV files that contain the cells' titles.
 	
-				String record_fields[] = record.split(";");
-				String authors[] = record_fields[1].split("\\|"); //pipeline escape , yparxei la8os, mallon den metraei swsta tous authors giati aytoi mporei na exoun spaces kai ""
+				String record_fields[] = record.split(";", 3);//Split the record in the indicated way until the second "word" (The Authors cell). The rest of the record is not needed.
+				String authors[] = record_fields[1].split("\\|"); //Split the authors field by the indicated | character. The pipe is treated as the OR operator in regex so we escape it with '\\' to treat it as a literal character.
 				
-				if(!record_fields[1].isEmpty()) { //wste na agnoisoume eggrafes poy einai kenes sto 2o pedio. Etsi leitoyrgei ontws alla me authors.len > 0 oxi
+				if(!record_fields[1].isEmpty()) { //Ignores potential records with an empty author field.
 					mapValue.set(authors.length);
-					mapKey.set(record_fields[1] + ","); //gia na diaxwristoun me ,
+					mapKey.set(record_fields[1] + ","); //The comma after the key helps splitting the Reducer's input below.
 					context.write(mapKey, mapValue);
 				}
 
@@ -51,12 +52,13 @@ public class App extends Configured implements Tool {
 	}
 	
 	
-	//prwti fasi reduce stelnei MONADIKA (oxi diplotipa) pairs omadas-megethous kai sunoliko plithos kai megethos olon ton omadon
+	//The first Reducer outputs UNIQUE pairs of Author teams and their respective size (No duplicate entries).
+	//It also keeps track of the total number and size of said teams to be used as input in the second Map Reduce phase.
 	public static class UniqueTeamsReducer extends Reducer<Text,IntWritable,Text,IntWritable> {
 		
 		public static enum MyCounters{
-			TEAM_COUNTER, //counter gia to plhthos monadikon teams
-			TOTAL_SIZE //counter gia to sunoliko plhthos atomon olon ton monadikon teams
+			TEAM_COUNTER, //Number of unique author teams.
+			TOTAL_SIZE //Aggregated team size of all unique teams.
 		}
 		
 		@Override
@@ -64,74 +66,62 @@ public class App extends Configured implements Tool {
 			throws IOException, InterruptedException {
 
 			long size = 0;
-			//Each number of "values" has the size of the team so we take the first.
-			IntWritable firstValue = null;
-			for(IntWritable value: values) {
-				firstValue = value;
-				size += value.get();
-				break;
-			}
+			
+			//Each "value" has the size of the team, so we only increment by the first one.
+			Iterator<IntWritable> sizeIterator = values.iterator();
+			IntWritable firstValue = sizeIterator.hasNext() ? sizeIterator.next() : null; //if "values" are empty, return null. Else, return the first element and stop. 
 			
 			//calculate the total number of teams and the total size of teams
 			context.getCounter(MyCounters.TEAM_COUNTER).increment(1);
 			context.getCounter(MyCounters.TOTAL_SIZE).increment(size);
 		
 			context.write(key, firstValue);
-			
 		} 
 	}
 	
 	
+	//!Second MapReduce phase!
 	
-	//Second Map Reduce phase
-	
-	
-	
-	//second phase mapper 
+	//Second phase Mapper 
 	public static class CompareMapper extends Mapper<LongWritable, Text, Text, IntWritable> {
 		Text mapKey = new Text();
 		IntWritable mapValue = new IntWritable();
 		private double averageSize;
 		
 		@Override
-		protected void setup(Context context) throws IOException, InterruptedException{ //idk an prepei protected i public
-			//take the average size from the configuration
+		protected void setup(Context context) throws IOException, InterruptedException{
+			//Get the average size from the run configuration
 			Configuration config = context.getConfiguration();
 			averageSize = config.getDouble("average team size",0.0);
-			//for debugging
-			System.out.println("average size: " + averageSize);
 		}
 		
 		@Override
 		public void map(LongWritable key, Text value, Context context) {
-			//take the value from output file from phase 1 MapReduce
-			String line = value.toString();
-			String teams_and_size[] = line.split(",\\s*");//kanoniki ekfrasi wste na kanei split me to , akolou8oumeno me miden i perissotera kena
+			String line = value.toString(); //A single record (in the format authorNames, teamSize) from the phase 1 Map Reduce output each time.
+			String team_and_size[] = line.split(",\\s*");//Regular expression splitting the input at , ignoring ANY (*) leading whitespace (\\s) after it.
 			
-				try {
-					
-					int teamSize = Integer.parseInt(teams_and_size[1]);
+			try {
+				
+				int teamSize = Integer.parseInt(team_and_size[1]);
 
-					mapKey.set("BelowAverage"); //den 8eloume tis omades mono poses einai. Ara ayto 8a boi8isei ton reducer apla na kanei sum aytou tou minadikou kleidiou
-					mapValue.set(1);
-							
-					if(teamSize < averageSize) { //check if the team's size is below the average
-						context.write(mapKey, mapValue);
-					}
-					
-					
-				} catch (IOException e) {
-					e.printStackTrace();
-				} catch (InterruptedException e) {
-					e.printStackTrace();
-				}
-			
+				//Just using the same "BelowAverage" string as the key now, as we are only concerned about HOW MANY teams
+				//are of below average total size and not WHO these specific teams are. Using the same key for all pairs is crucial for the Reducer below.
+				mapKey.set("BelowAverage"); 
+				mapValue.set(1);
+						
+				if(teamSize < averageSize) 
+					context.write(mapKey, mapValue);
+				
+			} catch (IOException e) {
+				e.printStackTrace();
+			} catch (InterruptedException e) {
+				e.printStackTrace();
+			}
 		}
-		
 	}
 	
 	
-	//second phase Reducer
+	//The second phase Reducer finally outputs the number of teams that are of below average total size.
 	public static class SumReducer extends Reducer<Text,IntWritable,Text,IntWritable> {
 		private int teamsBelowAverage = 0;
 		
@@ -139,62 +129,53 @@ public class App extends Configured implements Tool {
 		public void reduce(Text key, Iterable<IntWritable> values, Context context)
 			throws IOException, InterruptedException {
 			
-			for(IntWritable val: values) {
-				teamsBelowAverage += val.get();
-			}
+			for(IntWritable val: values) teamsBelowAverage += val.get(); //Because the key in all pairs is the same and the value is 1, this essentially sums the teams that are of below average total size.
 			
-			//8a emfanisei mono ena pair key-value sto output file ka8ws o CompareMapper 8a steilei polla pairs ALLA ME TO IDIO KLEIDI
+			//Will only save one Key-Pair value on the output file as the second phase Mapper sends many pairs with the SAME KEY.
 			context.write(new Text("Number of teams below average size"), new IntWritable(teamsBelowAverage));
 		}
 	}
 	
 	
+	public int run(String[] args) throws Exception {
+		//first job for first MapReduce phase.
+		Job job1 = Job.getInstance(getConf(), "Phase 1");
+		job1.setJarByClass(App.class);
+		job1.setNumReduceTasks(1);
+		job1.setMapperClass(TeamSizeMapper.class);
+		job1.setReducerClass(UniqueTeamsReducer.class);
+		job1.setOutputKeyClass(Text.class);
+		job1.setOutputValueClass(IntWritable.class);
+		FileInputFormat.addInputPath(job1, new Path(args[0]));
+		Path firstPhaseOutput = new Path(args[1]); //For use in the second job.
+		FileOutputFormat.setOutputPath(job1, firstPhaseOutput);
 	
+		if (!job1.waitForCompletion(true))
+			return 1; //Exit if Job1 fails.
 		
-		public int run(String[] args) throws Exception {
-			//first job for first MapReduce phase
-			Job job1 = Job.getInstance(getConf(), "Phase 1");
-			job1.setJarByClass(App.class);
-			job1.setNumReduceTasks(1);
-			job1.setMapperClass(TeamSizeMapper.class);
-			job1.setReducerClass(UniqueTeamsReducer.class);
-			job1.setOutputKeyClass(Text.class);
-			job1.setOutputValueClass(IntWritable.class);
-			FileInputFormat.addInputPath(job1, new Path(args[0]));
-			Path firstPhaseOutput = new Path(args[1]); //this path so i can use it later in second job
-			FileOutputFormat.setOutputPath(job1, firstPhaseOutput);
+		//Get the total number of teams.
+		long totalTeams = job1.getCounters().findCounter(UniqueTeamsReducer.MyCounters.TEAM_COUNTER).getValue();
+		//Get the total size of said teams (How many total authors).
+		long totalSize = job1.getCounters().findCounter(UniqueTeamsReducer.MyCounters.TOTAL_SIZE).getValue();
+		//Calculate average size of teams.
+		double averageTeamSize = (double) totalSize/totalTeams;
 		
-			if (!job1.waitForCompletion(true))
-				return 1; //Exit if Job1 fails
-			
-			//take the total number of teams
-			long totalTeams = job1.getCounters().findCounter(UniqueTeamsReducer.MyCounters.TEAM_COUNTER).getValue();
-			//take the total size of all teams (all the authors)
-			long totalSize = job1.getCounters().findCounter(UniqueTeamsReducer.MyCounters.TOTAL_SIZE).getValue();
-			//calculate average size of teams
-			double averageTeamSize = (double) totalSize/totalTeams;
-			
-			//for debugging
-			System.out.println("Total teams: " + totalTeams);
-			System.out.println("Total authors: " + totalSize);
-			
-			//put the average size in the configuration so the second mapper can take it for calculation
-			getConf().setDouble("average team size",averageTeamSize);
-			
-			//Second job for second MapReduce phase
-			Job job2 = Job.getInstance(getConf(), "Phase 2");
-			job2.setJarByClass(App.class);
-			job2.setNumReduceTasks(1);
-			job2.setMapperClass(CompareMapper.class);
-			job2.setReducerClass(SumReducer.class);
-			job2.setOutputKeyClass(Text.class);
-			job2.setOutputValueClass(IntWritable.class);
-			FileInputFormat.addInputPath(job2, firstPhaseOutput);
-			FileOutputFormat.setOutputPath(job2, new Path(args[2]));
-			
-			return job2.waitForCompletion(true) ? 0 : 1;
-	
-		}
+		//Put the average size in the run configuration so the second Mapper can use it for calculation.
+		getConf().setDouble("average team size",averageTeamSize);
+		
+		//Second job for second MapReduce phase.
+		Job job2 = Job.getInstance(getConf(), "Phase 2");
+		job2.setJarByClass(App.class);
+		job2.setNumReduceTasks(1);
+		job2.setMapperClass(CompareMapper.class);
+		job2.setReducerClass(SumReducer.class);
+		job2.setOutputKeyClass(Text.class);
+		job2.setOutputValueClass(IntWritable.class);
+		FileInputFormat.addInputPath(job2, firstPhaseOutput);
+		FileOutputFormat.setOutputPath(job2, new Path(args[2]));
+		
+		return job2.waitForCompletion(true) ? 0 : 1;
+	}
 
 	 public static void main(String[] args) throws Exception{
 		 ToolRunner.run(new Configuration(), new App(), args);
