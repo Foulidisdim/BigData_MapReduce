@@ -1,7 +1,6 @@
 package com.MapReduce.Hadoop_MapReduce;
 
 import java.io.IOException;
-import java.util.Iterator;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
@@ -145,7 +144,7 @@ public class App extends Configured implements Tool {
 		//first job for first MapReduce phase.
 		Job job1 = Job.getInstance(getConf(), "Phase 1");
 		job1.setJarByClass(App.class);
-		job1.setNumReduceTasks(1);
+		job1.setNumReduceTasks(2);
 		job1.setMapperClass(TeamSizeMapper.class);
 		job1.setReducerClass(UniqueTeamsReducer.class);
 		job1.setOutputKeyClass(Text.class);
@@ -170,7 +169,7 @@ public class App extends Configured implements Tool {
 		//Second job for second MapReduce phase.
 		Job job2 = Job.getInstance(getConf(), "Phase 2");
 		job2.setJarByClass(App.class);
-		job2.setNumReduceTasks(1);
+		job2.setNumReduceTasks(2);
 		job2.setMapperClass(CompareMapper.class);
 		job2.setReducerClass(SumReducer.class);
 		job2.setOutputKeyClass(Text.class);
