@@ -36,7 +36,7 @@ public class App extends Configured implements Tool {
 			try {
 				if(record.startsWith("id")) return; //Ignore the first line in the CSV files that contain the cells' titles.
 	
-				String record_fields[] = record.split(";", 3);//Split the record in the indicated way until the second "word" (The Authors cell). The rest of the record is not needed.
+				String record_fields[] = record.split(";",3);//Split the record in the indicated way until the second "word" (The Authors cell). The rest of the record is not needed.
 				String authors[] = record_fields[1].split("\\|"); //Split the authors field by the indicated | character. The pipe is treated as the OR operator in regex so we escape it with '\\' to treat it as a literal character.
 				
 				if(!record_fields[1].isEmpty()) { //Ignores potential records with an empty author field.
@@ -68,8 +68,12 @@ public class App extends Configured implements Tool {
 			long size = 0;
 			
 			//Each "value" has the size of the team, so we only increment by the first one.
-			Iterator<IntWritable> sizeIterator = values.iterator();
-			IntWritable firstValue = sizeIterator.hasNext() ? sizeIterator.next() : null; //if "values" are empty, return null. Else, return the first element and stop. 
+			IntWritable firstValue = null;
+			for(IntWritable val: values) {
+				firstValue = val;
+				size+=val.get();
+				break;
+			}
 			
 			//calculate the total number of teams and the total size of teams
 			context.getCounter(MyCounters.TEAM_COUNTER).increment(1);
