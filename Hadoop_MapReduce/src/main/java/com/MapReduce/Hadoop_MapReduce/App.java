@@ -141,6 +141,7 @@ public class App extends Configured implements Tool {
 	
 	
 	public int run(String[] args) throws Exception {
+		long startTime = System.currentTimeMillis();
 		//first job for first MapReduce phase.
 		Job job1 = Job.getInstance(getConf(), "Phase 1");
 		job1.setJarByClass(App.class);
@@ -177,7 +178,14 @@ public class App extends Configured implements Tool {
 		FileInputFormat.addInputPath(job2, firstPhaseOutput);
 		FileOutputFormat.setOutputPath(job2, new Path(args[2]));
 		
-		return job2.waitForCompletion(true) ? 0 : 1;
+		if(!job2.waitForCompletion(true)) {
+			return 1;
+		} else {
+			long endTime = System.currentTimeMillis() - startTime;
+			System.out.println("Time: " + endTime);
+			return 0;
+		}
+		
 	}
 
 	 public static void main(String[] args) throws Exception{
