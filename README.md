@@ -15,6 +15,13 @@ This Java-based project implements a two-phase **MapReduce** algorithm to analyz
 
 ---
 
+## 🧰 Tech Stack
+- **Java**
+- **Apache Hadoop framework**
+- **HDFS** (Hadoop Distributed File System) and **YARN** (Yet Another Resource Negotiator)
+
+---
+
 ## 🧠 Problem Description
 
 We analyze co-author records given in a dataset in CSV format. 
